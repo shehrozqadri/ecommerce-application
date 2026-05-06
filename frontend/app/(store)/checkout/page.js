@@ -95,6 +95,14 @@ export default function CheckoutPage() {
     const checkoutPayload = buildCheckoutPayload();
     const paymentOrder = await createRazorpayOrder(token, checkoutPayload);
 
+    const normalizedContact = String(addr.phone || "").replace(/\D/g, "");
+    const normalizedEmail = String(token ? user?.email || guestEmail : guestEmail || "").trim();
+    const prefill = {
+      name: addr.full_name?.trim() || undefined,
+      email: /^\S+@\S+\.\S+$/.test(normalizedEmail) ? normalizedEmail : undefined,
+      contact: /^\d{10,15}$/.test(normalizedContact) ? normalizedContact : undefined,
+    };
+
     await new Promise((resolve, reject) => {
       const razorpay = new window.Razorpay({
         key: razorpayKeyId,
@@ -103,11 +111,7 @@ export default function CheckoutPage() {
         name: "Ruhab Studio",
         description: "Secure online payment",
         order_id: paymentOrder.order_id,
-        prefill: {
-          name: addr.full_name,
-          email: token ? user?.email || guestEmail : guestEmail,
-          contact: addr.phone,
-        },
+        prefill,
         notes: {
           receipt: paymentOrder.receipt,
           customer: addr.full_name,
@@ -137,8 +141,18 @@ export default function CheckoutPage() {
       });
 
       razorpay.on("payment.failed", (response) => {
+        const details = [
+          response?.error?.code,
+          response?.error?.description,
+          response?.error?.reason,
+          response?.error?.source,
+          response?.error?.step,
+        ]
+          .filter(Boolean)
+          .join(" | ");
         const message =
-          response?.error?.description || response?.error?.reason || "Payment failed. Please try again.";
+          details || "Payment failed. Please try again.";
+        console.error("Razorpay payment.failed", response?.error || response);
         setPlacing(false);
         setError(message);
         reject(new Error(message));
