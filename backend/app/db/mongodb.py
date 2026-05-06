@@ -22,7 +22,12 @@ async def connect_to_mongo() -> None:
     await database[settings.collection_products].create_index("brand")
     await database[settings.collection_products].create_index("price")
     await database[settings.collection_products].create_index("is_active")
-    await database[settings.collection_products].create_index([("title", "text"), ("description", "text")])
+    
+    # Text index - skip if already exists (ignore errors)
+    try:
+        await database[settings.collection_products].create_index([("title", "text"), ("description", "text")])
+    except Exception:
+        pass  # Index likely already exists
     
     # Order indexes
     await database[settings.collection_orders].create_index("user_id")
