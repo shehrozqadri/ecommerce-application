@@ -26,7 +26,7 @@ const EMPTY_ADDR = {
 };
 
 export default function CheckoutPage() {
-  const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "";
+  const razorpayKeyId = (process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "").trim();
   const { token, user, setCartCount } = useUser();
   const router = useRouter();
   const [cart, setCart] = useState(null);
