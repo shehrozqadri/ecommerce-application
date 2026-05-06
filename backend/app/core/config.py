@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import List, Optional, Union
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     initial_admin_name: str = Field(default="Super Admin", alias="INITIAL_ADMIN_NAME")
     initial_admin_email: str = Field(default="admin@ruhabstudio.com", alias="INITIAL_ADMIN_EMAIL")
     initial_admin_password: str = Field(default="change-this-password", alias="INITIAL_ADMIN_PASSWORD")
+
+    @model_validator(mode="before")
+    @classmethod
+    def strip_string_values(cls, data):
+        if isinstance(data, dict):
+            return {k: (v.strip() if isinstance(v, str) else v) for k, v in data.items()}
+        return data
 
     @field_validator("cors_origins", mode="before")
     @classmethod
