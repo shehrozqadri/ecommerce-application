@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.gzip import GZipMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
@@ -19,8 +18,7 @@ async def lifespan(_: FastAPI):
 settings = get_settings()
 app = FastAPI(title=settings.app_name, debug=settings.app_debug, lifespan=lifespan)
 
-# Add compression middleware for faster API responses (min 1KB to compress)
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+# Note: Vercel already handles gzip compression on responses
 
 app.add_middleware(
     CORSMiddleware,
