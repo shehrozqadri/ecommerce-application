@@ -33,9 +33,13 @@ class Settings(BaseSettings):
     collection_products: str = Field(default="products", alias="COLLECTION_PRODUCTS")
     collection_users: str = Field(default="users", alias="COLLECTION_USERS")
     collection_orders: str = Field(default="orders", alias="COLLECTION_ORDERS")
+    collection_payment_attempts: str = Field(default="payment_attempts", alias="COLLECTION_PAYMENT_ATTEMPTS")
     collection_admins: str = Field(default="admins", alias="COLLECTION_ADMINS")
     collection_product_reviews: str = Field(default="product_reviews", alias="COLLECTION_PRODUCT_REVIEWS")
     collection_shipping_addresses: str = Field(default="shipping_addresses", alias="COLLECTION_SHIPPING_ADDRESSES")
+
+    razorpay_key_id: Optional[str] = Field(default=None, alias="RAZORPAY_KEY_ID")
+    razorpay_key_secret: Optional[str] = Field(default=None, alias="RAZORPAY_KEY_SECRET")
 
     initial_admin_name: str = Field(default="Super Admin", alias="INITIAL_ADMIN_NAME")
     initial_admin_email: str = Field(default="admin@ruhabstudio.com", alias="INITIAL_ADMIN_EMAIL")

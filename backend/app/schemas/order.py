@@ -43,6 +43,34 @@ class GuestOrderCreate(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
 
 
+class RazorpayCreateOrderRequest(BaseModel):
+    shipping_address: ShippingAddress
+    customer_email: Optional[EmailStr] = None
+    items: list[GuestOrderItemCreate] = Field(default_factory=list)
+    notes: Optional[str] = Field(default=None, max_length=500)
+    amount: Optional[int] = Field(default=None, ge=100)
+    currency: str = Field(default="INR", min_length=3, max_length=3)
+    receipt: Optional[str] = Field(default=None, max_length=80)
+
+
+class RazorpayCreateOrderResponse(BaseModel):
+    order_id: str
+    amount: int
+    currency: str
+    receipt: str
+
+
+class RazorpayVerifyPaymentRequest(BaseModel):
+    razorpay_payment_id: str = Field(min_length=1)
+    razorpay_order_id: str = Field(min_length=1)
+    razorpay_signature: str = Field(min_length=1)
+
+
+class RazorpayVerifyPaymentResponse(BaseModel):
+    success: bool
+    order: "OrderPublic"
+
+
 class OrderItemPublic(BaseModel):
     product_id: str
     title: str
@@ -70,3 +98,6 @@ class OrderPublic(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+RazorpayVerifyPaymentResponse.model_rebuild()

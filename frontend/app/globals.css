@@ -2379,7 +2379,12 @@ button:disabled {
   .store-checkout-layout { grid-template-columns: 1fr; }
   .store-cart-summary, .store-checkout-summary { position: static; }
   .collection-container { grid-template-columns: 1fr; }
-  .collection-filters { position: relative; top: auto; }
+  .collection-products { order: 1; }
+  .collection-filters {
+    order: 2;
+    position: relative;
+    top: auto;
+  }
 }
 
 @media (max-width: 768px) {

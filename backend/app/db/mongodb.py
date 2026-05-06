@@ -33,6 +33,9 @@ async def connect_to_mongo() -> None:
     await database[settings.collection_orders].create_index("user_id")
     await database[settings.collection_orders].create_index("status")
     await database[settings.collection_orders].create_index("created_at")
+    await database[settings.collection_payment_attempts].create_index("razorpay_order_id", unique=True)
+    await database[settings.collection_payment_attempts].create_index("status")
+    await database[settings.collection_payment_attempts].create_index("created_at")
 
 
 async def close_mongo_connection() -> None:

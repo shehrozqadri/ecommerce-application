@@ -1,8 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Script from "next/script";
 import { useRouter } from "next/navigation";
-import { fetchCart, placeOrder, fetchGuestCart, placeGuestOrder, clearGuestCart } from "@/lib/api";
+import {
+  clearGuestCart,
+  createRazorpayOrder,
+  fetchCart,
+  fetchGuestCart,
+  placeGuestOrder,
+  placeOrder,
+  verifyRazorpayPayment,
+} from "@/lib/api";
 import { useUser } from "@/lib/userContext";
 
 const EMPTY_ADDR = {
@@ -17,6 +26,7 @@ const EMPTY_ADDR = {
 };
 
 export default function CheckoutPage() {
+  const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "";
   const { token, user, setCartCount } = useUser();
   const router = useRouter();
   const [cart, setCart] = useState(null);
@@ -27,6 +37,7 @@ export default function CheckoutPage() {
   const [notes, setNotes] = useState("");
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
+  const [razorpayReady, setRazorpayReady] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -47,6 +58,96 @@ export default function CheckoutPage() {
     if (user?.email) setGuestEmail(user.email);
   }, [token]);
 
+  function buildCheckoutPayload() {
+    return {
+      customer_email: token ? user?.email || guestEmail || undefined : guestEmail,
+      items: (cart?.items || []).map((item) => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        size: item.size || undefined,
+        color: item.color || undefined,
+      })),
+      shipping_address: addr,
+      notes: notes || undefined,
+      amount: Math.max(100, Math.round(Number(cart?.total || 0) * 100)),
+      currency: "INR",
+    };
+  }
+
+  function finalizeSuccessfulOrder(order) {
+    if (!token) {
+      sessionStorage.setItem(`order_${order.id}`, JSON.stringify(order));
+      clearGuestCart();
+    }
+    setCartCount(0);
+    router.push(`/order-confirmation?id=${order.id}`);
+  }
+
+  async function startPrepaidCheckout() {
+    if (!razorpayKeyId) {
+      throw new Error("Razorpay key is missing. Add NEXT_PUBLIC_RAZORPAY_KEY_ID to the frontend environment.");
+    }
+
+    if (!razorpayReady || typeof window === "undefined" || !window.Razorpay) {
+      throw new Error("Payment gateway is still loading. Please try again.");
+    }
+
+    const checkoutPayload = buildCheckoutPayload();
+    const paymentOrder = await createRazorpayOrder(token, checkoutPayload);
+
+    await new Promise((resolve, reject) => {
+      const razorpay = new window.Razorpay({
+        key: razorpayKeyId,
+        amount: paymentOrder.amount,
+        currency: paymentOrder.currency,
+        name: "Ruhab Studio",
+        description: "Secure online payment",
+        order_id: paymentOrder.order_id,
+        prefill: {
+          name: addr.full_name,
+          email: token ? user?.email || guestEmail : guestEmail,
+          contact: addr.phone,
+        },
+        notes: {
+          receipt: paymentOrder.receipt,
+          customer: addr.full_name,
+        },
+        theme: {
+          color: "#ff3f6c",
+        },
+        modal: {
+          ondismiss: () => {
+            setPlacing(false);
+            setError("Payment was cancelled.");
+            reject(new Error("Payment cancelled"));
+          },
+        },
+        handler: async (response) => {
+          try {
+            const result = await verifyRazorpayPayment(token, response);
+            finalizeSuccessfulOrder(result.order);
+            setPlacing(false);
+            resolve(result.order);
+          } catch (verifyError) {
+            setPlacing(false);
+            setError(verifyError.message || "Payment verification failed");
+            reject(verifyError);
+          }
+        },
+      });
+
+      razorpay.on("payment.failed", (response) => {
+        const message =
+          response?.error?.description || response?.error?.reason || "Payment failed. Please try again.";
+        setPlacing(false);
+        setError(message);
+        reject(new Error(message));
+      });
+
+      razorpay.open();
+    });
+  }
+
   async function handlePlaceOrder(e) {
     e.preventDefault();
     setError("");
@@ -54,8 +155,15 @@ export default function CheckoutPage() {
       setError("Email is required for guest checkout");
       return;
     }
+
     setPlacing(true);
+
     try {
+      if (payMethod === "prepaid") {
+        await startPrepaidCheckout();
+        return;
+      }
+
       const order = token
         ? await placeOrder(token, {
             shipping_address: addr,
@@ -74,16 +182,15 @@ export default function CheckoutPage() {
             payment_method: payMethod,
             notes: notes || undefined,
           });
-      if (!token) {
-        sessionStorage.setItem(`order_${order.id}`, JSON.stringify(order));
-        clearGuestCart();
-      }
-      setCartCount(0);
-      router.push(`/order-confirmation?id=${order.id}`);
+      finalizeSuccessfulOrder(order);
     } catch (err) {
-      setError(err.message);
+      if (err?.message !== "Payment cancelled") {
+        setError(err.message || "Unable to complete checkout");
+      }
     } finally {
-      setPlacing(false);
+      if (payMethod !== "prepaid") {
+        setPlacing(false);
+      }
     }
   }
 
@@ -124,6 +231,12 @@ export default function CheckoutPage() {
 
   return (
     <div className="store-page">
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+        onLoad={() => setRazorpayReady(true)}
+        onError={() => setError("Failed to load the payment gateway. Please refresh and try again.")}
+      />
       <div className="store-checkout-page">
         <h1 className="store-page-title">Checkout</h1>
 
@@ -180,7 +293,7 @@ export default function CheckoutPage() {
                   />
                   <span>{label}</span>
                   {val === "prepaid" && (
-                    <span className="store-badge-new">Coming Soon</span>
+                    <span className="store-badge-new">Razorpay</span>
                   )}
                 </label>
               ))}
@@ -241,7 +354,7 @@ export default function CheckoutPage() {
               style={{ marginTop: "1.5rem" }}
               disabled={placing}
             >
-              {placing ? "Placing Order…" : "Place Order"}
+              {placing ? (payMethod === "prepaid" ? "Processing Payment…" : "Placing Order…") : payMethod === "prepaid" ? "Pay Now" : "Place Order"}
             </button>
           </div>
         </form>

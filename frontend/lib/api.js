@@ -564,6 +564,40 @@ export async function placeGuestOrder(payload) {
   return data;
 }
 
+export async function createRazorpayOrder(token, payload) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/store/orders/create-order`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  const data = await parseJsonResponse(response);
+  if (!response.ok) throwApiError(data, "Failed to create payment order");
+  return data;
+}
+
+export async function verifyRazorpayPayment(token, payload) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/store/orders/verify-payment`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  const data = await parseJsonResponse(response);
+  if (!response.ok) throwApiError(data, "Failed to verify payment");
+  return data;
+}
+
 export async function fetchOrders(token) {
   const response = await fetch(`${API_BASE_URL}/store/orders`, {
     headers: { Authorization: `Bearer ${token}` },
