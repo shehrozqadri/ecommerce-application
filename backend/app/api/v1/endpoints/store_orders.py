@@ -1,10 +1,13 @@
 import hashlib
 import hmac
+import json
+from base64 import b64encode
 from datetime import datetime, timezone
 from typing import Optional
+from urllib import error as urlerror
+from urllib import request as urlrequest
 from uuid import uuid4
 
-import razorpay
 from fastapi import APIRouter, Depends, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -40,14 +43,53 @@ def _to_public(doc: dict) -> OrderPublic:
     )
 
 
-def _get_razorpay_client() -> razorpay.Client:
+def _get_razorpay_credentials() -> tuple[str, str]:
     settings = get_settings()
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Online payments are not configured",
         )
-    return razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
+    return settings.razorpay_key_id, settings.razorpay_key_secret
+
+
+def _create_razorpay_order(amount: int, currency: str, receipt: str, customer_email: str) -> dict:
+    key_id, key_secret = _get_razorpay_credentials()
+    auth_header = b64encode(f"{key_id}:{key_secret}".encode("utf-8")).decode("utf-8")
+
+    body = json.dumps(
+        {
+            "amount": amount,
+            "currency": currency,
+            "receipt": receipt,
+            "notes": {
+                "source": "ruhab-store",
+                "customer_email": customer_email or "",
+            },
+        }
+    ).encode("utf-8")
+
+    req = urlrequest.Request(
+        "https://api.razorpay.com/v1/orders",
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Basic {auth_header}",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlrequest.urlopen(req, timeout=20) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urlerror.HTTPError as exc:
+        if exc.code == status.HTTP_401_UNAUTHORIZED:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Razorpay authentication failed") from exc
+        if exc.code == status.HTTP_400_BAD_REQUEST:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to create payment order") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to create payment order") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to create payment order") from exc
 
 
 async def _get_user_order_items(db: AsyncIOMotorDatabase, user_id: str) -> tuple[list[dict], float, str]:
@@ -206,26 +248,12 @@ async def create_razorpay_order(
 
     receipt = (payload.receipt or f"rcpt_{uuid4().hex[:20]}")[:80]
 
-    client = _get_razorpay_client()
-    try:
-        created = client.order.create(
-            {
-                "amount": amount,
-                "currency": (payload.currency or currency or "INR").upper(),
-                "receipt": receipt,
-                "notes": {
-                    "source": "ruhab-store",
-                    "customer_email": customer_email or "",
-                },
-            }
-        )
-    except razorpay.errors.BadRequestError as exc:
-        status_code = getattr(exc, "status_code", status.HTTP_400_BAD_REQUEST)
-        if status_code == status.HTTP_401_UNAUTHORIZED:
-            raise HTTPException(status_code=status_code, detail="Razorpay authentication failed") from exc
-        raise HTTPException(status_code=status_code, detail="Unable to create payment order") from exc
-    except (razorpay.errors.GatewayError, razorpay.errors.ServerError) as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to create payment order") from exc
+    created = _create_razorpay_order(
+        amount=amount,
+        currency=(payload.currency or currency or "INR").upper(),
+        receipt=receipt,
+        customer_email=customer_email or "",
+    )
 
     now = datetime.now(timezone.utc)
     await db[settings.collection_payment_attempts].insert_one(
