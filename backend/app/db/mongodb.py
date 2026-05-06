@@ -12,8 +12,22 @@ async def connect_to_mongo() -> None:
     settings = get_settings()
     client = AsyncIOMotorClient(settings.mongodb_uri)
     database = client[settings.mongodb_db_name]
+    
+    # Admin indexes
     await database[settings.collection_admins].create_index("email", unique=True)
     await database[settings.collection_admins].create_index([("role", 1), ("is_active", 1)])
+    
+    # Product indexes for faster queries and search
+    await database[settings.collection_products].create_index("category")
+    await database[settings.collection_products].create_index("brand")
+    await database[settings.collection_products].create_index("price")
+    await database[settings.collection_products].create_index("is_active")
+    await database[settings.collection_products].create_index([("title", "text"), ("description", "text")])
+    
+    # Order indexes
+    await database[settings.collection_orders].create_index("user_id")
+    await database[settings.collection_orders].create_index("status")
+    await database[settings.collection_orders].create_index("created_at")
 
 
 async def close_mongo_connection() -> None:

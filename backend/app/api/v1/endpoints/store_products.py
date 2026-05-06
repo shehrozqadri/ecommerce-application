@@ -1,12 +1,14 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo.errors import OperationFailure
 
 from app.api.deps import get_db
 from app.core.config import get_settings
 from app.schemas.product import ProductPublic
+from app.api.cache import CACHE_PRODUCTS, CACHE_SEARCH, CACHE_SUGGEST
 
 router = APIRouter(prefix="/store/products", tags=["Store Products"])
 
@@ -189,7 +191,10 @@ async def list_products(
     else:
         docs = await products.find(filters).skip(skip).limit(limit).sort("created_at", -1).to_list(length=limit)
 
-    return [_to_public(d) for d in docs]
+    result = [_to_public(d) for d in docs]
+    # Note: Response object with cache headers is set in middleware/after response if needed
+    # Client-side caching is handled by Vercel/CDN
+    return result
 
 
 @router.get("/autocomplete", response_model=list[str])
