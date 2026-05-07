@@ -49,6 +49,7 @@ export default function CheckoutPage() {
   const [showPaymentDisabledModal, setShowPaymentDisabledModal] = useState(false);
   const [showPayToRuhabModal, setShowPayToRuhabModal] = useState(false);
   const redirectTimeoutRef = useRef(null);
+  const redirectWindowRef = useRef(null);
 
   useEffect(() => {
     if (!token) {
@@ -73,6 +74,10 @@ export default function CheckoutPage() {
     return () => {
       if (redirectTimeoutRef.current) {
         window.clearTimeout(redirectTimeoutRef.current);
+      }
+
+      if (redirectWindowRef.current && !redirectWindowRef.current.closed) {
+        redirectWindowRef.current.close();
       }
     };
   }, []);
@@ -107,6 +112,10 @@ export default function CheckoutPage() {
   }
 
   function startPayToRuhabRedirect() {
+    if (typeof window !== "undefined") {
+      redirectWindowRef.current = window.open("about:blank", "_blank", "noopener,noreferrer");
+    }
+
     setPayMethod("pay_to_ruhab");
     setShowPayToRuhabModal(true);
     setPlacing(true);
@@ -116,10 +125,16 @@ export default function CheckoutPage() {
     }
 
     redirectTimeoutRef.current = window.setTimeout(() => {
-      window.open(RUHAB_INSTAGRAM_URL, "_blank", "noopener,noreferrer");
+      if (redirectWindowRef.current && !redirectWindowRef.current.closed) {
+        redirectWindowRef.current.location.href = RUHAB_INSTAGRAM_URL;
+      } else if (typeof window !== "undefined") {
+        window.location.href = RUHAB_INSTAGRAM_URL;
+      }
+
       setShowPayToRuhabModal(false);
       setPlacing(false);
       redirectTimeoutRef.current = null;
+      redirectWindowRef.current = null;
     }, 3000);
   }
 
