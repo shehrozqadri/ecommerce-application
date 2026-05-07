@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
@@ -28,10 +28,12 @@ const EMPTY_ADDR = {
 
 const RUHAB_INSTAGRAM_URL =
   "https://www.instagram.com/ruhab_studio?igsh=MWxkMjRhOWJnNnh3aw%3D%3D&utm_source=qr";
+const RUHAB_INSTAGRAM_APP_URL = "instagram://user?username=ruhab_studio";
 const ONLINE_PAYMENT_DISABLED_MSG =
   "Online payments are disabled for the time being. Please use Cash on Delivery or Pay to Ruhab option.";
 const PAY_TO_RUHAB_REDIRECT_MSG =
-  "You are being redirected to the Ruhab Studios Instagram page, where you can DM us to place your order.";
+  "Redirecting to Ruhab Studio Instagram. Please DM for Order Payment";
+const PAY_TO_RUHAB_RETURN_KEY = "ruhab_pay_to_ruhab_return";
 
 export default function CheckoutPage() {
   const razorpayKeyId = (process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "").trim();
@@ -49,9 +51,11 @@ export default function CheckoutPage() {
   const [showPaymentDisabledModal, setShowPaymentDisabledModal] = useState(false);
   const [showPayToRuhabModal, setShowPayToRuhabModal] = useState(false);
   const redirectTimeoutRef = useRef(null);
-  const redirectWindowRef = useRef(null);
+  const redirectPopupRef = useRef(null);
 
-  useEffect(() => {
+  const hydrateCheckoutState = useCallback(() => {
+    setLoading(true);
+
     if (!token) {
       const guestCart = fetchGuestCart();
       setCart(guestCart);
@@ -59,16 +63,42 @@ export default function CheckoutPage() {
       setLoading(false);
       return;
     }
+
     fetchCart(token)
       .then((d) => {
         setCart(d);
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token, setCartCount]);
+
+  useEffect(() => {
+    hydrateCheckoutState();
+
     if (user?.name) setAddr((a) => ({ ...a, full_name: user.name }));
     if (user?.phone) setAddr((a) => ({ ...a, phone: user.phone || "" }));
     if (user?.email) setGuestEmail(user.email);
-  }, [token]);
+  }, [token, user?.name, user?.phone, user?.email, hydrateCheckoutState]);
+
+  useEffect(() => {
+    function handlePageShow() {
+      if (
+        typeof window !== "undefined" &&
+        window.sessionStorage.getItem(PAY_TO_RUHAB_RETURN_KEY) === "1"
+      ) {
+        window.sessionStorage.removeItem(PAY_TO_RUHAB_RETURN_KEY);
+        window.location.reload();
+        return;
+      }
+
+      setShowPayToRuhabModal(false);
+      setPlacing(false);
+      hydrateCheckoutState();
+    }
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, [hydrateCheckoutState]);
 
   useEffect(() => {
     return () => {
@@ -76,8 +106,8 @@ export default function CheckoutPage() {
         window.clearTimeout(redirectTimeoutRef.current);
       }
 
-      if (redirectWindowRef.current && !redirectWindowRef.current.closed) {
-        redirectWindowRef.current.close();
+      if (redirectPopupRef.current && !redirectPopupRef.current.closed) {
+        redirectPopupRef.current.close();
       }
     };
   }, []);
@@ -112,29 +142,73 @@ export default function CheckoutPage() {
   }
 
   function startPayToRuhabRedirect() {
-    if (typeof window !== "undefined") {
-      redirectWindowRef.current = window.open("about:blank", "_blank", "noopener,noreferrer");
+    if (showPayToRuhabModal) {
+      return;
+    }
+
+    const isMobileClient =
+      typeof navigator !== "undefined" &&
+      /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
+        navigator.userAgent || ""
+      );
+
+    let popupWindow = null;
+    if (!isMobileClient && typeof window !== "undefined") {
+      popupWindow = window.open("", "_blank");
+      if (popupWindow && popupWindow.document) {
+        popupWindow.document.title = "Ruhab Studio";
+        popupWindow.document.body.style.margin = "0";
+        popupWindow.document.body.style.fontFamily = "Inter, sans-serif";
+        popupWindow.document.body.style.display = "grid";
+        popupWindow.document.body.style.placeItems = "center";
+        popupWindow.document.body.style.background = "#f6f2ee";
+        popupWindow.document.body.style.color = "#241f31";
+        popupWindow.document.body.innerHTML = "Redirecting to Ruhab Studio Instagram…";
+      }
+      redirectPopupRef.current = popupWindow;
     }
 
     setPayMethod("pay_to_ruhab");
     setShowPayToRuhabModal(true);
     setPlacing(true);
 
+    if (typeof window !== "undefined") {
+      if (isMobileClient) {
+        window.sessionStorage.setItem(PAY_TO_RUHAB_RETURN_KEY, "1");
+      } else {
+        window.sessionStorage.removeItem(PAY_TO_RUHAB_RETURN_KEY);
+      }
+    }
+
     if (redirectTimeoutRef.current) {
       window.clearTimeout(redirectTimeoutRef.current);
     }
 
     redirectTimeoutRef.current = window.setTimeout(() => {
-      if (redirectWindowRef.current && !redirectWindowRef.current.closed) {
-        redirectWindowRef.current.location.href = RUHAB_INSTAGRAM_URL;
-      } else if (typeof window !== "undefined") {
-        window.location.href = RUHAB_INSTAGRAM_URL;
-      }
-
       setShowPayToRuhabModal(false);
       setPlacing(false);
       redirectTimeoutRef.current = null;
-      redirectWindowRef.current = null;
+
+      if (typeof window !== "undefined") {
+        if (isMobileClient) {
+          window.location.assign(RUHAB_INSTAGRAM_APP_URL);
+          return;
+        }
+
+        if (popupWindow && !popupWindow.closed) {
+          popupWindow.location.replace(RUHAB_INSTAGRAM_URL);
+          redirectPopupRef.current = null;
+          return;
+        }
+
+        const fallbackWindow = window.open("", "_blank");
+        if (fallbackWindow) {
+          fallbackWindow.location.replace(RUHAB_INSTAGRAM_URL);
+          return;
+        }
+
+        setError("Popup was blocked. Please allow popups and try again.");
+      }
     }, 3000);
   }
 
@@ -220,6 +294,12 @@ export default function CheckoutPage() {
   async function handlePlaceOrder(e) {
     e.preventDefault();
     setError("");
+
+    if (payMethod === "pay_to_ruhab") {
+      startPayToRuhabRedirect();
+      return;
+    }
+
     if (!token && !guestEmail.trim()) {
       setError("Email is required for guest checkout");
       return;
@@ -228,11 +308,6 @@ export default function CheckoutPage() {
     setPlacing(true);
 
     try {
-      if (payMethod === "pay_to_ruhab") {
-        startPayToRuhabRedirect();
-        return;
-      }
-
       if (payMethod === "prepaid") {
         openPaymentDisabledModal();
         setPayMethod("cod");
@@ -299,7 +374,7 @@ export default function CheckoutPage() {
           placeholder={placeholder}
           value={addr[key]}
           onChange={(e) => setAddr((a) => ({ ...a, [key]: e.target.value }))}
-          required={required}
+          required={required && payMethod !== "pay_to_ruhab"}
         />
       </div>
     );
@@ -329,7 +404,7 @@ export default function CheckoutPage() {
                   placeholder="you@example.com"
                   value={guestEmail}
                   onChange={(e) => setGuestEmail(e.target.value)}
-                  required
+                  required={payMethod !== "pay_to_ruhab"}
                 />
               </div>
             )}
@@ -374,7 +449,7 @@ export default function CheckoutPage() {
                       }
 
                       if (val === "pay_to_ruhab") {
-                        startPayToRuhabRedirect();
+                        setPayMethod(val);
                         return;
                       }
 
