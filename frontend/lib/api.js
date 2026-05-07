@@ -3,6 +3,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8
 export const TOKEN_KEY =
   process.env.NEXT_PUBLIC_ACCESS_TOKEN_STORAGE_KEY || "ruhab_access_token";
 
+export const STORE_AUTH_EXPIRED_EVENT = "store:auth-expired";
+
 async function parseJsonResponse(response) {
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
@@ -48,8 +50,26 @@ function formatApiError(detail) {
   return String(detail);
 }
 
-function throwApiError(data, fallbackMessage) {
-  throw new Error(formatApiError(data?.detail) || fallbackMessage);
+function throwApiError(data, fallbackMessage, options = {}) {
+  const message = formatApiError(data?.detail) || fallbackMessage;
+  const error = new Error(message);
+  error.status = options.status;
+  error.isAuthError = Boolean(options.isAuthError);
+
+  if (error.isAuthError && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(STORE_AUTH_EXPIRED_EVENT));
+  }
+
+  throw error;
+}
+
+function isAuthFailure(response, data) {
+  if (response?.status === 401) {
+    return true;
+  }
+
+  const detail = formatApiError(data?.detail) || "";
+  return /could not validate credentials|unauthorized|not authenticated/i.test(detail);
 }
 
 export async function loginAdmin({ email, password }) {
@@ -344,7 +364,12 @@ export async function fetchUserMe(token) {
     cache: "no-store",
   });
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Unauthorized");
+  if (!response.ok) {
+    throwApiError(data, "Unauthorized", {
+      status: response.status,
+      isAuthError: isAuthFailure(response, data),
+    });
+  }
   return data;
 }
 
@@ -392,7 +417,12 @@ export async function fetchCart(token) {
     cache: "no-store",
   });
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Failed to load cart");
+  if (!response.ok) {
+    throwApiError(data, "Failed to load cart", {
+      status: response.status,
+      isAuthError: isAuthFailure(response, data),
+    });
+  }
   return data;
 }
 
@@ -403,7 +433,12 @@ export async function addToCart(token, { product_id, quantity = 1, size, color }
     body: JSON.stringify({ product_id, quantity, size, color }),
   });
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Failed to add to cart");
+  if (!response.ok) {
+    throwApiError(data, "Failed to add to cart", {
+      status: response.status,
+      isAuthError: isAuthFailure(response, data),
+    });
+  }
   return data;
 }
 
@@ -414,7 +449,12 @@ export async function updateCartItem(token, productId, quantity) {
     body: JSON.stringify({ quantity }),
   });
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Failed to update cart");
+  if (!response.ok) {
+    throwApiError(data, "Failed to update cart", {
+      status: response.status,
+      isAuthError: isAuthFailure(response, data),
+    });
+  }
   return data;
 }
 
@@ -424,7 +464,12 @@ export async function removeFromCart(token, productId) {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Failed to remove item");
+  if (!response.ok) {
+    throwApiError(data, "Failed to remove item", {
+      status: response.status,
+      isAuthError: isAuthFailure(response, data),
+    });
+  }
   return data;
 }
 
@@ -434,7 +479,12 @@ export async function clearCart(token) {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Failed to clear cart");
+  if (!response.ok) {
+    throwApiError(data, "Failed to clear cart", {
+      status: response.status,
+      isAuthError: isAuthFailure(response, data),
+    });
+  }
   return data;
 }
 
@@ -549,7 +599,12 @@ export async function placeOrder(token, payload) {
     body: JSON.stringify(payload),
   });
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Failed to place order");
+  if (!response.ok) {
+    throwApiError(data, "Failed to place order", {
+      status: response.status,
+      isAuthError: isAuthFailure(response, data),
+    });
+  }
   return data;
 }
 
@@ -577,7 +632,12 @@ export async function createRazorpayOrder(token, payload) {
   });
 
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Failed to create payment order");
+  if (!response.ok) {
+    throwApiError(data, "Failed to create payment order", {
+      status: response.status,
+      isAuthError: Boolean(token) && isAuthFailure(response, data),
+    });
+  }
   return data;
 }
 
@@ -594,7 +654,12 @@ export async function verifyRazorpayPayment(token, payload) {
   });
 
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Failed to verify payment");
+  if (!response.ok) {
+    throwApiError(data, "Failed to verify payment", {
+      status: response.status,
+      isAuthError: Boolean(token) && isAuthFailure(response, data),
+    });
+  }
   return data;
 }
 
@@ -604,7 +669,12 @@ export async function fetchOrders(token) {
     cache: "no-store",
   });
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Failed to load orders");
+  if (!response.ok) {
+    throwApiError(data, "Failed to load orders", {
+      status: response.status,
+      isAuthError: isAuthFailure(response, data),
+    });
+  }
   return data;
 }
 
@@ -614,6 +684,11 @@ export async function fetchOrder(token, orderId) {
     cache: "no-store",
   });
   const data = await parseJsonResponse(response);
-  if (!response.ok) throwApiError(data, "Order not found");
+  if (!response.ok) {
+    throwApiError(data, "Order not found", {
+      status: response.status,
+      isAuthError: isAuthFailure(response, data),
+    });
+  }
   return data;
 }

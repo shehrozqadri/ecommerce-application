@@ -31,7 +31,7 @@ export default function LoginPage() {
     <div className="store-auth-page">
       <div className="store-auth-card">
         <Link href="/" className="store-auth-logo">Ruhab Studio</Link>
-        <h1 className="store-auth-title">Welcome Back</h1>
+        <h1 className="store-auth-title">Welcome</h1>
         <p className="store-auth-sub">Sign in to continue shopping</p>
 
         {error && <div className="store-alert store-alert-error">{error}</div>}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchStoreProducts, fetchStoreSuggestions } from "@/lib/api";
 import { fetchWishlist, toggleWishlist } from "@/lib/wishlist";
+import BufferedImage from "@/components/BufferedImage";
 
 function CollectionContent() {
   const router = useRouter();
@@ -351,7 +352,7 @@ function ProductCard({ product, isWishlisted, onToggleWishlist }) {
         </button>
 
         {image ? (
-          <img src={image} alt={product.title} className="store-product-img" />
+          <BufferedImage src={image} alt={product.title} className="store-product-img" />
         ) : (
           <div className="store-product-img-placeholder">
             <span>🧵</span>

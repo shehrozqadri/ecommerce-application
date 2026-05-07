@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fetchStoreProducts, fetchStoreSuggestions } from "@/lib/api";
+import BufferedImage from "@/components/BufferedImage";
 
 export default function StorePage() {
   const router = useRouter();
@@ -162,7 +163,7 @@ export default function StorePage() {
                 aria-label={`View ${p.title}`}
               >
                 {p.images?.[0]?.url ? (
-                  <img src={p.images[0].url} alt={p.title} />
+                  <BufferedImage src={p.images[0].url} alt={p.title} loading="eager" />
                 ) : (
                   <div className="store-product-img-placeholder sm"><span>🧵</span></div>
                 )}

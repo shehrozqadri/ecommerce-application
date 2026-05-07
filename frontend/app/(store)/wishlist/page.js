@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchWishlist, removeFromWishlist } from "@/lib/wishlist";
+import BufferedImage from "@/components/BufferedImage";
 
 export default function WishlistPage() {
   const [items, setItems] = useState([]);
@@ -50,7 +51,7 @@ export default function WishlistPage() {
                   </button>
 
                   {item.image_url ? (
-                    <img src={item.image_url} alt={item.title} className="store-product-img" />
+                    <BufferedImage src={item.image_url} alt={item.title} className="store-product-img" />
                   ) : (
                     <div className="store-product-img-placeholder"><span>🧵</span></div>
                   )}

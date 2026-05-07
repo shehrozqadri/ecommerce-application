@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { fetchOrders } from "@/lib/api";
 import { useUser } from "@/lib/userContext";
+import BufferedImage from "@/components/BufferedImage";
 
 const STATUS_COLOR = {
   pending: "store-status-pending",
@@ -69,7 +70,14 @@ function OrdersList() {
               <div className="store-order-items">
                 {order.items.map((item, i) => (
                   <div key={i} className="store-order-item">
-                    {item.image_url && <img src={item.image_url} alt={item.title} />}
+                    {item.image_url && (
+                      <BufferedImage
+                        src={item.image_url}
+                        alt={item.title}
+                        wrapperClassName="store-order-item-thumb"
+                        className="store-order-item-image"
+                      />
+                    )}
                     <div>
                       <p className="store-order-item-title">{item.title}</p>
                       <p className="store-order-item-meta">

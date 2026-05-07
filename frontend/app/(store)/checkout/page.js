@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import {
   verifyRazorpayPayment,
 } from "@/lib/api";
 import { useUser } from "@/lib/userContext";
+import BufferedImage from "@/components/BufferedImage";
 
 const EMPTY_ADDR = {
   full_name: "",
@@ -24,6 +25,13 @@ const EMPTY_ADDR = {
   pincode: "",
   country: "India",
 };
+
+const RUHAB_INSTAGRAM_URL =
+  "https://www.instagram.com/ruhab_studio?igsh=MWxkMjRhOWJnNnh3aw%3D%3D&utm_source=qr";
+const ONLINE_PAYMENT_DISABLED_MSG =
+  "Online payments are disabled for the time being. Please use Cash on Delivery or Pay to Ruhab option.";
+const PAY_TO_RUHAB_REDIRECT_MSG =
+  "You are being redirected to the Ruhab Studios Instagram page, where you can DM us to place your order.";
 
 export default function CheckoutPage() {
   const razorpayKeyId = (process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "").trim();
@@ -38,6 +46,9 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
   const [razorpayReady, setRazorpayReady] = useState(false);
+  const [showPaymentDisabledModal, setShowPaymentDisabledModal] = useState(false);
+  const [showPayToRuhabModal, setShowPayToRuhabModal] = useState(false);
+  const redirectTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (!token) {
@@ -57,6 +68,14 @@ export default function CheckoutPage() {
     if (user?.phone) setAddr((a) => ({ ...a, phone: user.phone || "" }));
     if (user?.email) setGuestEmail(user.email);
   }, [token]);
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        window.clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
 
   function buildCheckoutPayload() {
     return {
@@ -83,6 +102,27 @@ export default function CheckoutPage() {
     router.push(`/order-confirmation?id=${order.id}`);
   }
 
+  function openPaymentDisabledModal() {
+    setShowPaymentDisabledModal(true);
+  }
+
+  function startPayToRuhabRedirect() {
+    setPayMethod("pay_to_ruhab");
+    setShowPayToRuhabModal(true);
+    setPlacing(true);
+
+    if (redirectTimeoutRef.current) {
+      window.clearTimeout(redirectTimeoutRef.current);
+    }
+
+    redirectTimeoutRef.current = window.setTimeout(() => {
+      window.open(RUHAB_INSTAGRAM_URL, "_blank", "noopener,noreferrer");
+      setShowPayToRuhabModal(false);
+      setPlacing(false);
+      redirectTimeoutRef.current = null;
+    }, 3000);
+  }
+
   async function startPrepaidCheckout() {
     if (!razorpayKeyId) {
       throw new Error("Razorpay key is missing. Add NEXT_PUBLIC_RAZORPAY_KEY_ID to the frontend environment.");
@@ -102,7 +142,7 @@ export default function CheckoutPage() {
       email: /^\S+@\S+\.\S+$/.test(normalizedEmail) ? normalizedEmail : undefined,
       contact: /^\d{10,15}$/.test(normalizedContact) ? normalizedContact : undefined,
     };
-
+    
     await new Promise((resolve, reject) => {
       const razorpay = new window.Razorpay({
         key: razorpayKeyId,
@@ -173,8 +213,15 @@ export default function CheckoutPage() {
     setPlacing(true);
 
     try {
+      if (payMethod === "pay_to_ruhab") {
+        startPayToRuhabRedirect();
+        return;
+      }
+
       if (payMethod === "prepaid") {
-        await startPrepaidCheckout();
+        openPaymentDisabledModal();
+        setPayMethod("cod");
+        setPlacing(false);
         return;
       }
 
@@ -291,6 +338,7 @@ export default function CheckoutPage() {
               {[
                 ["cod", "Cash on Delivery"],
                 ["prepaid", "Online Payment"],
+                ["pay_to_ruhab", "Pay to Ruhab"],
               ].map(([val, label]) => (
                 <label
                   key={val}
@@ -303,7 +351,20 @@ export default function CheckoutPage() {
                     name="payment"
                     value={val}
                     checked={payMethod === val}
-                    onChange={() => setPayMethod(val)}
+                    onChange={() => {
+                      if (val === "prepaid") {
+                        openPaymentDisabledModal();
+                        setPayMethod("cod");
+                        return;
+                      }
+
+                      if (val === "pay_to_ruhab") {
+                        startPayToRuhabRedirect();
+                        return;
+                      }
+
+                      setPayMethod(val);
+                    }}
                   />
                   <span>{label}</span>
                   {val === "prepaid" && (
@@ -332,7 +393,12 @@ export default function CheckoutPage() {
               {cart.items.map((item, i) => (
                 <div key={i} className="store-checkout-item">
                   {item.image_url && (
-                    <img src={item.image_url} alt={item.title} />
+                    <BufferedImage
+                      src={item.image_url}
+                      alt={item.title}
+                      wrapperClassName="store-checkout-item-thumb"
+                      className="store-checkout-item-image"
+                    />
                   )}
                   <div>
                     <p className="store-checkout-item-title">{item.title}</p>
@@ -368,11 +434,60 @@ export default function CheckoutPage() {
               style={{ marginTop: "1.5rem" }}
               disabled={placing}
             >
-              {placing ? (payMethod === "prepaid" ? "Processing Payment…" : "Placing Order…") : payMethod === "prepaid" ? "Pay Now" : "Place Order"}
+              {placing
+                ? payMethod === "prepaid"
+                  ? "Processing Payment…"
+                  : payMethod === "pay_to_ruhab"
+                    ? "Redirecting…"
+                    : "Placing Order…"
+                : payMethod === "prepaid"
+                  ? "Pay Now"
+                  : payMethod === "pay_to_ruhab"
+                    ? "Go to Instagram"
+                    : "Place Order"}
             </button>
           </div>
         </form>
       </div>
+
+      {showPaymentDisabledModal && (
+        <div
+          className="store-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Online payments disabled"
+          onClick={() => setShowPaymentDisabledModal(false)}
+        >
+          <div className="store-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3>Online Payment Unavailable</h3>
+            <p>{ONLINE_PAYMENT_DISABLED_MSG}</p>
+            <button
+              type="button"
+              className="store-btn-primary"
+              onClick={() => setShowPaymentDisabledModal(false)}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showPayToRuhabModal && (
+        <div
+          className="store-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Redirecting to Instagram"
+        >
+          <div className="store-modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3>Redirecting to Ruhab</h3>
+            <p>{PAY_TO_RUHAB_REDIRECT_MSG}</p>
+            <div className="store-loading-full" style={{ minHeight: "unset", paddingTop: "0.25rem" }}>
+              <div className="store-buffer-ring" />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

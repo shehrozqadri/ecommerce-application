@@ -1,6 +1,12 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
-import { USER_TOKEN_KEY, USER_KEY, fetchGuestCart } from "./api";
+import {
+  USER_TOKEN_KEY,
+  USER_KEY,
+  fetchGuestCart,
+  fetchUserMe,
+  STORE_AUTH_EXPIRED_EVENT,
+} from "./api";
 
 const UserContext = createContext(null);
 
@@ -13,13 +19,44 @@ export function UserProvider({ children }) {
     const storedToken = localStorage.getItem(USER_TOKEN_KEY);
     const storedUser = localStorage.getItem(USER_KEY);
     if (storedToken && storedUser) {
+      const parsedUser = JSON.parse(storedUser);
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      setUser(parsedUser);
+
+      fetchUserMe(storedToken)
+        .then((freshUser) => {
+          localStorage.setItem(USER_KEY, JSON.stringify(freshUser));
+          setUser(freshUser);
+        })
+        .catch((error) => {
+          if (error?.isAuthError) {
+            localStorage.removeItem(USER_TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            setToken(null);
+            setUser(null);
+            const guestCart = fetchGuestCart();
+            setCartCount(guestCart.item_count);
+          }
+        });
       return;
     }
 
     const guestCart = fetchGuestCart();
     setCartCount(guestCart.item_count);
+  }, []);
+
+  useEffect(() => {
+    function handleAuthExpired() {
+      localStorage.removeItem(USER_TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      setToken(null);
+      setUser(null);
+      const guestCart = fetchGuestCart();
+      setCartCount(guestCart.item_count);
+    }
+
+    window.addEventListener(STORE_AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => window.removeEventListener(STORE_AUTH_EXPIRED_EVENT, handleAuthExpired);
   }, []);
 
   function signIn(tokenVal, userData) {

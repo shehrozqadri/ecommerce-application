@@ -10,6 +10,7 @@ import {
   removeGuestCartItem,
 } from "@/lib/api";
 import { useUser } from "@/lib/userContext";
+import BufferedImage from "@/components/BufferedImage";
 
 export default function CartPage() {
   const { token, setCartCount } = useUser();
@@ -82,7 +83,7 @@ export default function CartPage() {
               <div key={i} className="store-cart-item">
                 <div className="store-cart-item-img">
                   {item.image_url
-                    ? <img src={item.image_url} alt={item.title} />
+                    ? <BufferedImage src={item.image_url} alt={item.title} />
                     : <div className="store-product-img-placeholder sm"><span>🧵</span></div>
                   }
                 </div>

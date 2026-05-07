@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { fetchStoreProduct, addToCart, addToGuestCart } from "@/lib/api";
 import { useUser } from "@/lib/userContext";
+import BufferedImage from "@/components/BufferedImage";
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -50,18 +51,33 @@ export default function ProductDetailPage() {
     setAdding(true);
     setFeedback(null);
     try {
-      const cart = token
-        ? await addToCart(token, {
+      let cart;
+      if (token) {
+        try {
+          cart = await addToCart(token, {
             product_id: product.id,
             quantity,
             size: selectedSize,
             color: selectedColor,
-          })
-        : addToGuestCart(product, {
+          });
+        } catch (err) {
+          if (!err?.isAuthError) {
+            throw err;
+          }
+          cart = addToGuestCart(product, {
             quantity,
             size: selectedSize,
             color: selectedColor,
           });
+        }
+      } else {
+        cart = addToGuestCart(product, {
+          quantity,
+          size: selectedSize,
+          color: selectedColor,
+        });
+      }
+
       setCartCount(cart.item_count);
       setFeedback({ type: "success", msg: "Added to cart!" });
       setIsInCart(true);
@@ -104,9 +120,10 @@ export default function ProductDetailPage() {
         <div className="store-pdp-gallery">
           <div className="store-pdp-main-img">
             {product.images?.[selectedImage]?.url ? (
-              <img
+              <BufferedImage
                 src={product.images[selectedImage].url}
                 alt={product.title}
+                loading="eager"
               />
             ) : (
               <div className="store-product-img-placeholder large">
@@ -122,7 +139,7 @@ export default function ProductDetailPage() {
                   className={`store-pdp-thumb${selectedImage === i ? " active" : ""}`}
                   onClick={() => setSelectedImage(i)}
                 >
-                  <img src={img.url} alt={`View ${i + 1}`} />
+                  <BufferedImage src={img.url} alt={`View ${i + 1}`} />
                 </button>
               ))}
             </div>

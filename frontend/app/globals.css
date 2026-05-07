@@ -1175,6 +1175,10 @@ button:disabled {
   min-height: 40vh;
 }
 
+.store-loading-buffer-screen {
+  min-height: 100vh;
+}
+
 .store-spinner {
   width: 36px;
   height: 36px;
@@ -1182,6 +1186,63 @@ button:disabled {
   border-top-color: var(--brand);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
+}
+
+.store-buffer-ring {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(124, 77, 255, 0.12);
+  border-top-color: var(--brand);
+  border-right-color: var(--brand-2);
+  animation: spin 0.8s linear infinite;
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.55);
+}
+
+.store-buffer-ring-lg {
+  width: 58px;
+  height: 58px;
+  border-width: 4px;
+}
+
+.store-media-buffer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+  background: #f8f4f0;
+}
+
+.store-buffer-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(246, 242, 238, 0.92));
+  z-index: 1;
+  pointer-events: none;
+}
+
+.store-media-buffer img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.28s ease, transform 0.4s ease;
+}
+
+.store-media-buffer.is-loaded img {
+  opacity: 1;
+}
+
+.store-media-buffer.is-failed img {
+  display: none;
+}
+
+.store-media-buffer.is-failed .store-buffer-overlay {
+  display: none;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -1557,10 +1618,9 @@ button:disabled {
   background: rgba(255, 255, 255, 0.85);
 }
 
-.store-hero-thumb img {
+.store-hero-thumb .store-media-buffer {
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1735,9 +1795,6 @@ button:disabled {
 }
 
 .store-product-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
   transition: transform 0.4s ease;
 }
 
@@ -1855,7 +1912,7 @@ button:disabled {
   aspect-ratio: 3/4;
 }
 
-.store-pdp-main-img img { width: 100%; height: 100%; object-fit: cover; }
+.store-pdp-main-img .store-media-buffer { width: 100%; height: 100%; }
 
 .store-pdp-thumbnails {
   display: flex;
@@ -1876,7 +1933,7 @@ button:disabled {
 }
 
 .store-pdp-thumb.active { border-color: var(--brand); }
-.store-pdp-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.store-pdp-thumb .store-media-buffer { width: 100%; height: 100%; }
 
 .store-pdp-info { display: grid; gap: 0.75rem; align-content: start; padding-top: 0.5rem; }
 .store-pdp-title { font-size: 1.8rem; font-weight: 700; line-height: 1.2; }
@@ -1986,7 +2043,6 @@ button:disabled {
 }
 
 .store-cart-item-img { width: 100px; height: 120px; border-radius: 0.65rem; overflow: hidden; background: #f8f4f0; }
-.store-cart-item-img img { width: 100%; height: 100%; object-fit: cover; }
 .store-cart-item-info { display: grid; gap: 0.35rem; align-content: start; }
 .store-cart-item-title { font-weight: 600; font-size: 1rem; text-decoration: none; color: var(--text); }
 .store-cart-item-title:hover { color: var(--brand); }
@@ -2056,7 +2112,7 @@ button:disabled {
   gap: 0.85rem;
   align-items: center;
 }
-.store-checkout-item img { width: 60px; height: 72px; object-fit: cover; border-radius: 0.5rem; }
+.store-checkout-item-thumb { width: 60px; height: 72px; border-radius: 0.5rem; overflow: hidden; }
 .store-checkout-item-title { font-size: 0.9rem; font-weight: 600; }
 .store-checkout-item-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; }
 .store-checkout-item-price { font-weight: 600; font-size: 0.95rem; white-space: nowrap; }
@@ -2114,7 +2170,7 @@ button:disabled {
   gap: 1rem;
   align-items: center;
 }
-.store-order-item img { width: 56px; height: 68px; object-fit: cover; border-radius: 0.5rem; }
+.store-order-item-thumb { width: 56px; height: 68px; border-radius: 0.5rem; overflow: hidden; }
 .store-order-item-title { font-weight: 600; font-size: 0.9rem; }
 .store-order-item-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; }
 .store-order-item-price { font-weight: 600; font-size: 0.9rem; white-space: nowrap; }
@@ -2536,6 +2592,14 @@ button:disabled {
   border-radius: 6px;
 }
 
+.order-confirmation-item-thumb {
+  width: 80px;
+  height: 80px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
 .order-confirmation-item-details {
   flex: 1;
   display: flex;
@@ -2700,6 +2764,11 @@ button:disabled {
   }
 
   .order-confirmation-item-image {
+    width: 100%;
+    height: 150px;
+  }
+
+  .order-confirmation-item-thumb {
     width: 100%;
     height: 150px;
   }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { fetchOrder } from "@/lib/api";
 import { useUser } from "@/lib/userContext";
+import BufferedImage from "@/components/BufferedImage";
 
 function OrderConfirmationContent() {
   const { token } = useUser();
@@ -80,7 +81,12 @@ function OrderConfirmationContent() {
               {order.items.map((item, idx) => (
                 <div key={idx} className="order-confirmation-item">
                   {item.image_url && (
-                    <img src={item.image_url} alt={item.title} className="order-confirmation-item-image" />
+                    <BufferedImage
+                      src={item.image_url}
+                      alt={item.title}
+                      wrapperClassName="order-confirmation-item-thumb"
+                      className="order-confirmation-item-image"
+                    />
                   )}
                   <div className="order-confirmation-item-details">
                     <p className="order-confirmation-item-title">{item.title}</p>
